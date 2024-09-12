@@ -18,104 +18,107 @@ plt.style.use('classic')
 
 def main(args):
 
+    pair = [] 
+    output = pd.DataFrame( columns=['row','col','nReadouts','nHits'] )
     #noisescan_col13_row18_20240911-181123
-    for r in range(0,35,1):
-        for c in range(0,35,1):
-            filename = f"{args.datadir}/noisescan_col{c}_row{r}_*.csv"
-
-    
-            pair = [] 
+    for r in range(18,19,1):
+        for c in range(13,15,1):
+            findfile = f"{args.datadir}/noisescan_col{c}_row{r}_*.csv"
+            filename = glob.glob(findfile)
+            if filename:
+                df = pd.read_csv(filename[0],sep=',')
+            else:
+                print(f"r{r} c{c}: FILE NOT FOUND")
+                continue
             tot_n_nans = 0
             tot_n_evts = 0
             n_evt_excluded = 0
             n_evt_used = 0
             
-            df = pd.read_csv(filename,sep=',')
 
-            n_all_rows = df.shape[0]
-            #print(f"n_all_rows={n_all_rows}")
-            n_non_nan_rows = df['readout'].count() 
+            n_all_rows = df.shape[0] #num of rows in .csv file
+            n_non_nan_rows = df['readout'].count() #valid number of row of 'readout' in .csv file
             n_nan_evts = n_all_rows - n_non_nan_rows
             df = df.apply(pd.to_numeric, errors='coerce')
             df = df.dropna()
             df['readout'] = df['readout'].astype('Int64')
 
-            max_readout_n = df['readout'].iloc[-1]
+            max_readout_n = df['readout'].iloc[-1] #value from last row of 'readout'
+            nreadouts = max_readout_n+1
+            #print(f"n_all_rows={n_all_rows}")
+            #print(f"n_non_nan_rows={n_non_nan_rows}")
+            #print(f"max_readout_n={max_readout_n}")
     
-            ni = 0
-            for ievt in range(0, max_readout_n+1, 1):
-                dff = df.loc[(df['readout'] == ievt)] 
-                if dff.empty:
-                    continue
-                else:
-                    ni += 1
-            n_evts = ni + n_nan_evts
-            tot_n_evts += n_evts
-            tot_n_nans += n_nan_evts
+            nhits = 0
 
-            for ievt in range(0, max_readout_n+1, 1):
+            for ievt in range(0, nreadouts, 1):
                 dff = df.loc[(df['readout'] == ievt) & (df['payload'] == 4) & (df['Chip ID'] == 0)]
                 if dff.empty:
                     continue
         # Match col and row to find hit pixel
                 else:
-                    n_evt_used += 1
-                    dffcol = dff.loc[dff['isCol'] == True]
-                    dffrow = dff.loc[dff['isCol'] == False]
+                    dffcol = dff.loc[dff['isCol'] == 1]
+                    dffrow = dff.loc[dff['isCol'] == 0]
                     timestamp_diff = args.timestampdiff
                     tot_time_limit = args.totdiff
 
                     for indc in dffcol.index:
                        for indr in dffrow.index:
-                            if dffcol['tot_us'][indc] == 0 or dffrow['tot_us'][indr] ==0:
+                            if (abs(dffcol['timestamp'][indc] - dffrow['timestamp'][indr]) > timestamp_diff): continue
+                            if dffcol['tot_us'][indc] == 0 or dffrow['tot_us'][indr] ==0: continue
+                            if (abs(dffcol['tot_us'][indc] - dffrow['tot_us'][indr])/dffcol['tot_us'][indc]*100 > tot_time_limit): continue
+                            if (dffcol['location'][indc] != c or dffrow['location'][indr] != r):
+                                print(f"[Matching but Continue] col.location, row.location = {dffcol['location'][indc]},{dffrow['location'][indr]}")
                                 continue
-                            if (abs(dffcol['timestamp'][indc] - dffrow['timestamp'][indr]) < timestamp_diff) & (abs(dffcol['tot_us'][indc] - dffrow['tot_us'][indr])/dffcol['tot_us'][indc]*100 < tot_time_limit):
-                                if (dffcol['location'][indc] > 34 or dffrow['location'][indr] > 34):
-                                    print(f"[Matching but Continue] col.location, row.location = {dffcol['location'][indc]},{dffrow['location'][indr]}")
-                                    continue
+                            else:
                                 average_tot = ((dffcol['tot_us'][indc] + dffrow['tot_us'][indr])/2)
                                 pair.append([ dffcol['location'][indc], dffrow['location'][indr], dffcol['timestamp'][indc], dffrow['timestamp'][indr], dffcol['tot_us'][indc], dffrow['tot_us'][indr], ((dffcol['tot_us'][indc] + dffrow['tot_us'][indr])/2)])
-            print("... Matching is done!")
+                                nhits += 1
 
-    ##### Summary of how many events being used ###################################################
-            nevents = '%.2f' % ((n_evt_used/(tot_n_evts)) * 100.)
-            nnanevents = '%.2f' % ((tot_n_nans/(tot_n_evts)) * 100.)
-            n_empty = tot_n_evts - n_evt_used - tot_n_nans
-            nemptyevents = '%.2f' % ((n_empty/(tot_n_evts)) * 100.)
-            print("Summary:")
-            print(f"{tot_n_nans} of {tot_n_evts} events were found as NaN...")
-            print(f"{n_empty} of {tot_n_evts} events were found as empty...")
-            print(f"{n_evt_used} of {tot_n_evts} events were processed...")
+            print(f"r{r} c{c}: {nhits} hits of {nreadouts} readouts")# Summary of how many events being used
+            output.loc[len(output)] = [r, c, nreadouts, nhits]
 
-    ###############################################################################################
-    print(f"{len(pixs)}, {npixel}% active")
+    print(output)
+    output.to_csv(f"{args.datadir}/summary.csv", index=False)
 
-    pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
-    print(pixs)
-    npixel = '%.2f' % ( (1-(len(pixs)/1225)) * 100.)
-    print(f"{len(pixs)}, {npixel}% active")
-     
-    ##### Create hit pixel dataframes #######################################################
-    # Hit pixel information for all events
-    dffpair = pd.DataFrame(pair, columns=['col', 'row', 
-                                          'timestamp_col', 'timestamp_row', 
-                                          'tot_us_col', 'tot_us_row', 'avg_tot_us'])
-    # Create dataframe for number of hits 
-    dfpair = dffpair[['col','row']].copy()
-    dfpairc = dfpair[['col','row']].value_counts().reset_index(name='hits')
-    # How many hits are collected and shown in a plot
-    nhits = dfpairc['hits'].sum()
-    # mean of avg_tot_us, each col, row
-    grouped_avg = dffpair.groupby(['col', 'row'])['avg_tot_us'].mean().reset_index(name='avg')
-    print(grouped_avg)
+    row = 2
+    col = 2
+    fig, ax = plt.subplots(row, col, figsize=(12, 10))
+    for irow in range(0, row):
+        for icol in range(0, col):
+            for axis in ['top','bottom','left','right']:
+                ax[irow, icol].spines[axis].set_linewidth(1.5)
 
-    
+    p1 = ax[0, 0].hist2d(x=output['col'], y=output['row'], 
+           bins=35, range=[[0,35],[0,35]],  # col, row의 범위로 빈 지정
+           weights=output['nHits'],  # nReadouts로 가중치 부여
+           cmap='YlOrRd',
+           cmin=1.0, norm=matplotlib.colors.LogNorm())  # 색상
+    ax[0,0].grid()
+    ax[0, 0].set_xlabel('Col', fontweight = 'bold', fontsize=14)
+    ax[0, 0].set_ylabel('Row', fontweight = 'bold', fontsize=14)
+    ax[0, 0].xaxis.set_tick_params(labelsize = 14)
+    ax[0, 0].yaxis.set_tick_params(labelsize = 14)
+
+    p2 = ax[0, 1].hist2d(x=output['col'], y=output['row'], 
+           bins=35, range=[[0,35],[0,35]],  # col, row의 범위로 빈 지정
+           weights=output['nHits'],  # nReadouts로 가중치 부여
+           cmap='YlOrRd',
+           cmin=1.0, norm=matplotlib.colors.LogNorm())  # 색상
+    fig.colorbar(p2[3], ax=ax[0, 1]).set_label(label='Masked', weight='bold', size=14)
+    ax[0,1].grid()
+    ax[0, 1].set_xlabel('Col', fontweight = 'bold', fontsize=14)
+    ax[0, 1].set_ylabel('Row', fontweight = 'bold', fontsize=14)
+    ax[0, 1].xaxis.set_tick_params(labelsize = 14)
+    ax[0, 1].yaxis.set_tick_params(labelsize = 14)
+
+    plt.show()
+
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Astropix Driver Code')
-
-    parser.add_argument('-if', '--inputfile', required=True, default =None,
-                    help = 'input file')
 
     parser.add_argument('-n', '--name', default='APSw08s03', required=False,
                     help='chip ID that can be used in name of output file (default=APSw08s03)')
