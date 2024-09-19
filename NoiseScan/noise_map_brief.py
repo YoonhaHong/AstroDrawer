@@ -1,8 +1,5 @@
-"""
-02/2023 Jihee Kim added number of events from csv file of beam measurements
-06/2024 Bobae Kim updated
-09/09/2024 Yoonha Hong updataed
-"""
+#09/2024 Yoonha Hong 
+
 import argparse
 import csv
 import matplotlib.pyplot as plt
@@ -19,7 +16,51 @@ plt.style.use('classic')
 
 def main(args):
 
-    pair = [] 
+    #outfilename=f"./{args.name}_{args.threshold}_summary.csv"
+    outfilename=f"{args.datadir}/{args.name}_{args.threshold}_summary.csv"
+    if not os.path.exists(outfilename): makesummary(outpath=outfilename)
+    output= pd.read_csv(outfilename)
+
+    print(output.head(5))
+
+    fig, ax = plt.subplots(figsize=(8, 8))  # 사이즈 설정, 정사각형으로
+
+    p1 = ax.hist2d(x=output['col'], y=output['row'], 
+               bins=35, range=[[0, 35], [0, 35]], 
+               weights=output['nReadouts'],  
+               cmap='YlOrRd',
+               norm=matplotlib.colors.LogNorm())
+
+
+    top_n = 10
+    count = 0
+
+    for index, row in output.iterrows():
+        if row['nReadouts'] == 0:
+            break
+        if count < top_n:
+            ax.text(row['col']+0.5, row['row']+0.5, row['nReadouts'],
+                     va="center", ha="center", color="w", fontsize=7)
+            count += 1
+
+    cbar = fig.colorbar(p1[3], ax=ax, fraction=0.046, pad=0.04)  # fraction, pad로 크기 조절
+    #cbar.set_label(label='Hit Counts', weight='bold', size=14)
+
+    ax.set_aspect('equal', adjustable='box')
+
+    ax.set_xlabel('Col', fontweight='bold', fontsize=14)
+    ax.set_ylabel('Row', fontweight='bold', fontsize=14)
+    ax.tick_params(labelsize=14)
+    ax.grid()
+
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
+    #fig.suptitle(f'chip ID = {args.name}, Threhold = {args.threshold} mV', fontsize=16, fontweight='bold')
+
+    plt.savefig(f"./fig/{args.name}_THR{args.threshold}_readout.pdf")
+    plt.show()
+
+
+def makesummary(outpath):
     output = pd.DataFrame( columns=['row','col','nReadouts','nHits'] )
     #noisescan_col13_row18_20240911-181123
     for r in range(0,35,1):
@@ -31,10 +72,6 @@ def main(args):
             else:
                 print(f"r{r} c{c}: FILE NOT FOUND")
                 continue
-            tot_n_nans = 0
-            tot_n_evts = 0
-            n_evt_excluded = 0
-            n_evt_used = 0
             
 
             n_all_rows = df.shape[0] #num of rows in .csv file
@@ -80,79 +117,11 @@ def main(args):
             print(f"r{r} c{c}: {nhits} hits of {nreadouts} readouts")# Summary of how many events being used
             output.loc[len(output)] = [r, c, nreadouts, nhits]
 
-    nhits_sorted_output = output.sort_values(by='nHits', ascending=False)
-    nevents_sorted_output = output.sort_values(by='nReadouts',ascending=False)
+    output = output.sort_values(by='nReadouts',ascending=False)
+    output.to_csv(outpath, index=False)
+    print("Made .csv file")
 
-    print(nhits_sorted_output.head(5))
-    print(nevents_sorted_output.head(5))
-    #print(output)
-    #output.to_csv(f"{args.datadir}/{args.name}_{args.threshold}_summary.csv", index=False)
 
-    row = 2
-    col = 2
-    fig, ax = plt.subplots(row, col, figsize=(row*6, row*5))
-    for irow in range(0, row):
-        for icol in range(0, col):
-            for axis in ['top','bottom','left','right']:
-                ax[irow, icol].spines[axis].set_linewidth(1.5)
-
-    #### Hit Map ####
-    p1 = ax[0, 0].hist2d(x=output['col'], y=output['row'], 
-           bins=35, range=[[0,35],[0,35]], 
-           weights=output['nHits'],  
-           cmap='YlOrRd',
-           #cmin=1.0, 
-           norm=matplotlib.colors.LogNorm())  
-    fig.colorbar(p1[3], ax=ax[0, 0]).set_label(label='Hit Counts', weight='bold', size=14)
-    ax[0,0].grid()
-    ax[0, 0].set_xlabel('Col', fontweight = 'bold', fontsize=14)
-    ax[0, 0].set_ylabel('Row', fontweight = 'bold', fontsize=14)
-    ax[0, 0].xaxis.set_tick_params(labelsize = 14)
-    ax[0, 0].yaxis.set_tick_params(labelsize = 14)
-
-    #### Readout Map ####
-    p2 = ax[0, 1].hist2d(x=output['col'], y=output['row'], 
-           bins=35, range=[[0,35],[0,35]], 
-           weights=output['nHits'], 
-           cmap='YlOrRd',
-           #cmin=1.0, 
-           norm=matplotlib.colors.LogNorm()) 
-    fig.colorbar(p2[3], ax=ax[0, 1]).set_label(label='Readout Counts', weight='bold', size=14)
-    ax[0,1].grid()
-    ax[0, 1].set_xlabel('Col', fontweight = 'bold', fontsize=14)
-    ax[0, 1].set_ylabel('Row', fontweight = 'bold', fontsize=14)
-    ax[0, 1].xaxis.set_tick_params(labelsize = 14)
-    ax[0, 1].yaxis.set_tick_params(labelsize = 14)
-
-    ax[1, 0].set_axis_off()
-    table = Table(ax[1,0], bbox=[0, 0, 1, 1])  # ax[1,0] 안에 표 위치 조정
-
-    # 열 제목 추가
-    columns = ['col', 'row', 'nHits', 'nReadouts']
-    for i, col_name in enumerate(columns):
-        table.add_cell(0, i, width=0.2, height=0.1, text=col_name, loc='center', facecolor='lightgrey')
-
-    rank = 10
-    for i in range(rank):
-        table.add_cell(i+1, 0, width=0.2, height=0.1, text=str(nhits_sorted_output['col'].iloc[i]), loc='center')
-        table.add_cell(i+1, 1, width=0.2, height=0.1, text=str(nhits_sorted_output['row'].iloc[i]), loc='center')
-        table.add_cell(i+1, 2, width=0.2, height=0.1, text=str(nhits_sorted_output['nHits'].iloc[i]), loc='center')
-        table.add_cell(i+1, 3, width=0.2, height=0.1, text=str(nhits_sorted_output['nReadouts'].iloc[i]), loc='center')
-
-    # Add table to ax[1,0]
-    ax[1,0].add_table(table)   
-
-    # Text
-    ax[1, 1].set_axis_off()
-    ax[1, 1].text(0.05, 0.85, f"ChipID: {args.name}", fontsize=18, fontweight = 'bold');
-    ax[1, 1].text(0.05, 0.75, f"Threshold: {args.threshold} mV", fontsize=18, fontweight = 'bold');
-    ax[1, 1].text(0.05, 0.65, f"Time for each pixel: {0.084} min.", fontsize=18, fontweight = 'bold');
-    ax[1, 1].text(0.05, 0.45, "Hits are processed below", fontsize=15, fontweight = 'bold');
-    ax[1, 1].text(0.05, 0.35, f"conditions: <{args.timestampdiff} timestamp and <{args.totdiff}% in ToT", fontsize=15, fontweight = 'bold');
-
-    ax[1, 0].set_title(f"TOP{rank} noisy pixels", fontweight = 'bold', fontsize=14)
-    plt.savefig(f"./{args.name}_THR{args.threshold}_noisemap.pdf")
-    plt.show()
 
 
 
