@@ -137,6 +137,9 @@ def main(args):
     ###############################################################################################
     # Masking pixels
     # Read noise scan summary file
+
+        #APSw08s03_100_summary
+
 #    disablepix=[]
 #    if args.noisescaninfo is not None:
 #        print("masking pixels")
@@ -158,7 +161,16 @@ def main(args):
     for r in range(0,35,1):
         for c in range(0,3,1): 
                 disablepix.append([c, r, 1])
-    disablepix.append( [13,18,1] )
+
+    noise_scan_summary = f"{args.noisescandir}/{args.name}_{args.threshold:.0f}_summary.csv"
+    nss = pd.read_csv(noise_scan_summary)
+    pixels_to_mask = nss[nss['disable'] > 0]
+
+    for index, row in pixels_to_mask.iterrows():
+        _row = int( row['row'])
+        _col = int( row['col'])
+        disablepix.append([_col, _row, 1])
+
     pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
     print(pixs)
     npixel = '%.2f' % ( (1-(len(pixs)/1225)) * 100.)
@@ -323,14 +335,13 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--name', default='APSw08s03', required=False,
                     help='chip ID that can be used in name of output file (default=APSw08s03)')
 
-#    parser.add_argument('-l','--runnolist', nargs='+', required=True,
-#                    help = 'List run number(s) you would like to see')
-
     parser.add_argument('-o', '--outdir', default='.', required=False,
                     help='output directory for all png files')
 
 #    parser.add_argument('-d', '--datadir', required=False, default =None,
 #                    help = 'input directory for beam data file')
+    parser.add_argument('-t', '--threshold', type = float, action='store', required=True, default=None,
+                    help = 'Threshold voltage for digital ToT (in mV). DEFAULT value in yml OR 100mV if voltagecard not in yml')
 
     parser.add_argument('-td','--timestampdiff', type=float, required=False, default=2,
                     help = 'difference in timestamp in pixel matching (default:col.ts-row.ts<2)')
@@ -341,7 +352,7 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--beaminfo', default='Sr90', required=False,
                     help='beam information ex) proton120GeV')
 
-    parser.add_argument('-ns', '--noisescaninfo', action='store', required=False, type=str, default ='.',
+    parser.add_argument('-ns', '--noisescandir', action='store', required=False, type=str, default ='../astropix-python/noisescan',
                     help = 'filepath noise scan summary file containing chip noise infomation.')
 
     parser.add_argument
