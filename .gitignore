@@ -1,3 +1,7 @@
 NoiseScan/noise*/
+InjectionScan
 .DS_Store
 *.pdf
+*.csv
+*.png
+
