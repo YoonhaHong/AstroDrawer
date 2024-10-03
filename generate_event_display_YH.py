@@ -3,6 +3,8 @@
 06/2024 Bobae Kim updated
 09/09/2024 Yoonha Hong updataed
 """
+import os
+import re
 import argparse
 import csv
 import matplotlib.pyplot as plt
@@ -10,25 +12,12 @@ import matplotlib
 import pandas as pd
 import numpy as np
 import glob
-import os
 from matplotlib.colors import Normalize
 import matplotlib as mpl
 import asyncio
 plt.style.use('classic')
 
 def main(args):
-
-    ##### Find and Combine all data files #####################################
-    # Path to beam data location
-    # Collect a list of multiple beamdata files
-    #filename_list = [f"{path}/run{runnum}_*.csv" for runnum in args.runnolist]
-#    filename_list = [f"{path}/{runnum}" for runnum in args.inputfile]
-#    # List multiple beamdata csv files
-#    all_files = []
-#    for fname in filename_list:
-#        nfile = glob.glob(fname)
-#        all_files += nfile
-    ###########################################################################
 
     ##### Loop over data files and Find hit pixels #######################################################
     # List for hit pixels
@@ -42,7 +31,11 @@ def main(args):
     #for f in all_files:
      # Read csv file
     f = args.inputfile
-    print(f"Reading in {f}")
+    file_name = os.path.basename(f)
+
+    match = re.search(r'THR(\d+\.\d+)', file_name)
+
+    threshold = float(match.group(1)) if match else args.threshold  # 소수점 형식으로 변환
     df = pd.read_csv(f,sep=',')
     #print(df.head())
     print(f"Reading is done")
@@ -138,38 +131,22 @@ def main(args):
     # Masking pixels
     # Read noise scan summary file
 
-        #APSw08s03_100_summary
-
-#    disablepix=[]
-#    if args.noisescaninfo is not None:
-#        print("masking pixels")
-#        noise_input_file = open(args.noisescaninfo, 'r')
-#        lines = noise_input_file.readlines()
-#    # Get counts
-#        count_vals=0
-#        for line in lines:
-#            noise_val = int(line.split('\t')[2])
-#            col_val = int(line.split('\t')[0])
-#            row_val = int(line.split('\t')[1])
-#            if noise_val > 100:
-#                disablepix.append([col_val, row_val,1])
-#    pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
-#    print(pixs)
-#    npixel = '%.2f' % ( (1-(len(pixs)/1225)) * 100.)
-#    print(f"{len(pixs)}, {npixel}% active")
     disablepix=[]
     for r in range(0,35,1):
         for c in range(0,3,1): 
                 disablepix.append([c, r, 1])
 
-    noise_scan_summary = f"{args.noisescandir}/{args.name}_{args.threshold:.0f}_summary.csv"
-    nss = pd.read_csv(noise_scan_summary)
-    pixels_to_mask = nss[nss['disable'] > 0]
+    datadir = "../../data" if os.path.exists("../../data") else "/Users/yoonha/cernbox/AstroPix"
+    noise_scan_summary=f"{datadir}/NoiseScan/{args.name}_{threshold:.0f}_summary.csv"
+    pixels_to_mask = pd.read_csv(noise_scan_summary)
 
     for index, row in pixels_to_mask.iterrows():
         _row = int( row['row'])
         _col = int( row['col'])
-        disablepix.append([_col, _row, 1])
+        _nreadouts = int( row['nReadouts'])
+        _nhits = int( row['nHits'])
+        masking_logic = (_nreadouts > args.rdothr) or (_nhits > args.hitthr)
+        if(masking_logic): disablepix.append([_col, _row, 1])
 
     pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
     print(pixs)
@@ -190,62 +167,6 @@ def main(args):
     grouped_avg = dffpair.groupby(['col', 'row'])['avg_tot_us'].mean().reset_index(name='avg')
     print(grouped_avg)
 
-
-# Create dataframe for number of hits per 5 by 5 pixels grid
-#    i = 0
-#    n_group = 5
-#    center = round(n_group/2)
-#    npixels = 0
-#    paircsmooth = []
-#    while i < 35:
-#        j = 0
-#        while j < 35:
-#            df_or = dfpairc[((dfpairc['col'] >= i) & (dfpairc['col'] < i+5)) & 
-#                            ((dfpairc['row'] >= j) & (dfpairc['row'] < j+5))]
-#            paircsmooth.append([i+center, j+center, df_or['hits'].sum()/df_or.shape[0]])
-#            npixels += df_or.shape[0]
-#            j += n_group
-#        i += n_group
-#    dfpaircsmooth =pd.DataFrame(paircsmooth, columns=['col', 'row', 'hits'])
-#    npixel = '%.2f' % ((npixels/1225) * 100.)
-#    # Create dataframe for normalized time-over-threshold per pixel
-#    i = 0
-#    pixel = []
-#    while i < 35:
-#        j = 0
-#        while j < 35:
-#            df_and = dffpair[((dffpair['col'] == i) & (dffpair['row'] == j))]    
-#            if df_and.empty:
-#                j += 1
-#                continue
-#            else:
-#                pixel.append([i, j, 
-#                              df_and['avg_tot_us'].sum()/df_and.shape[0]])
-#                j += 1
-#        i += 1
-#    dfpixel = pd.DataFrame(pixel, columns=['col', 'row', 'norm_sum_avg_tot_us'])
-#    # Create dataframe for normalized time-over-threshold per 5 by 5 pixels grid
-#    i = 0
-#    n_group = 5
-#    center = round(n_group/2)
-#    pixelsmooth = []
-#    while i < 35:
-#        j = 0
-#        while j < 35:
-#            df_or = dfpixel[((dfpixel['col'] >= i) & (dfpixel['col'] < i+5)) & 
-#                            ((dfpixel['row'] >= j) & (dfpixel['row'] < j+5))]
-#            pixelsmooth.append([i+center, j+center, 
-#                                df_or['norm_sum_avg_tot_us'].sum()/df_or.shape[0]])
-#            j += n_group
-#        i += n_group
-#    
-#    dfpixelsmooth = pd.DataFrame(pixelsmooth, columns=['col', 'row', 'norm_sum_avg_tot_us'])
-
-    #########################################################################################
-    #npixel = '%.2f' % ((npixels/1225) * 100.)
-    #########################################################################################
-    # Print run number(s)
-    
     # Generate Plot - Pixel hits
     #fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(20, 8))
     row = 2
@@ -264,7 +185,9 @@ def main(args):
     ax[0, 0].xaxis.set_tick_params(labelsize = 14)
     ax[0, 0].yaxis.set_tick_params(labelsize = 14)
 
-    p2 = ax[0, 1].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], weights=pixs['disable'], norm=Normalize(vmin=0,vmax=1),cmap='Greys')
+    p2 = ax[0, 1].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
+                         weights=pixs['disable'], 
+                         norm=Normalize(vmin=0,vmax=1),cmap='Greys')
     fig.colorbar(p2[3], ax=ax[0, 1]).set_label(label='Masked', weight='bold', size=14)
     ax[0,1].grid()
     ax[0, 1].set_xlabel('Col', fontweight = 'bold', fontsize=14)
@@ -273,7 +196,9 @@ def main(args):
     ax[0, 1].yaxis.set_tick_params(labelsize = 14)
 
 #p1+p2 overlay plot
-    p3 = ax[0,2].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], weights=pixs['disable'], norm=Normalize(vmin=0,vmax=1),cmap='Greys')
+    p3 = ax[0,2].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
+                        weights=pixs['disable'], 
+                        norm=Normalize(vmin=0,vmax=1),cmap='Greys')
     # p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
     p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0)
 #    p3 = ax[1, 0].hist2d(x=dfpixel['col'], y=dfpixel['row'], bins=35, range=[[-0.5,34.5],[-0,35]], weights=dfpixel['norm_sum_avg_tot_us'], cmap='Blues',cmin=1.0, norm=matplotlib.colors.LogNorm())
@@ -320,9 +245,9 @@ def main(args):
     #plt.savefig(f"{args.outdir}/{args.beaminfo}_{args.name}_run_{runnum}_evtdisplay.png")
     #print(f"{args.outdir}/{args.beaminfo}_{args.name}_run_{runnum}_evtdisplay.png was created...")
 
-    plt.savefig(f"{args.outdir}/{args.inputfile}_{args.beaminfo}_{args.name}_diffTS{args.timestampdiff}_diffToT{args.totdiff}.png")
-    print(f"{args.inputfile}_{args.beaminfo}_{args.name}_diffTS{args.timestampdiff}_diffToT{args.totdiff}.png was created...")
-    # Draw Plot
+    figdir=args.outdir if args.outdir else os.path.dirname(f)
+    plt.savefig(f"{figdir}/{file_name}_{args.beaminfo}_diffTS{args.timestampdiff}_diffToT{args.totdiff}.png")
+    print(f"Saved at {figdir}")
     plt.show()
     
 if __name__ == "__main__":
@@ -335,13 +260,17 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--name', default='APSw08s03', required=False,
                     help='chip ID that can be used in name of output file (default=APSw08s03)')
 
-    parser.add_argument('-o', '--outdir', default='.', required=False,
+    parser.add_argument('-o', '--outdir', default=None, required=False,
                     help='output directory for all png files')
 
-#    parser.add_argument('-d', '--datadir', required=False, default =None,
-#                    help = 'input directory for beam data file')
-    parser.add_argument('-t', '--threshold', type = float, action='store', required=True, default=None,
+    parser.add_argument('-t', '--threshold', type = float, action='store', required=False, default=None,
                     help = 'Threshold voltage for digital ToT (in mV). DEFAULT value in yml OR 100mV if voltagecard not in yml')
+
+    parser.add_argument('-rt','--rdothr', type=int, required=False, default=9,
+                    help = 'threshold for nReadouts')
+   
+    parser.add_argument('-ht','--hitthr', type=int, required=False, default=9,
+                    help = 'threshold for nHits')
 
     parser.add_argument('-td','--timestampdiff', type=float, required=False, default=2,
                     help = 'difference in timestamp in pixel matching (default:col.ts-row.ts<2)')
