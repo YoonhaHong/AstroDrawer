@@ -15,6 +15,7 @@ import glob
 from matplotlib.colors import Normalize
 import matplotlib as mpl
 import asyncio
+from utility import yaml_reader
 plt.style.use('classic')
 
 def main(args):
@@ -32,10 +33,18 @@ def main(args):
      # Read csv file
     f = args.inputfile
     file_name = os.path.basename(f)
+    dir_name = os.path.dirname(f)
+    file_name = file_name.rstrip('.csv')
 
-    match = re.search(r'THR(\d+\.\d+)', file_name)
+    thr_match = re.search(r'THR(\d+)', file_name)
 
-    threshold = float(match.group(1)) if match else args.threshold  # 소수점 형식으로 변환
+    # THR 뒤에 _로 구분된 문자열들을 추출 (csv 확장자는 제외)
+    split_parts = re.split(r'THR\d+\.?\d*_', file_name)[-1].split('_')
+
+    threshold = thr_match.group(1) if thr_match else args.threshold  
+    name = split_parts[0]
+    date = split_parts[1]
+
     df = pd.read_csv(f,sep=',')
     #print(df.head())
     print(f"Reading is done")
@@ -130,28 +139,15 @@ def main(args):
     ###############################################################################################
     # Masking pixels
     # Read noise scan summary file
-
-    disablepix=[]
-    for r in range(0,35,1):
-        for c in range(0,3,1): 
-                disablepix.append([c, r, 1])
-
     datadir = "../../data" if os.path.exists("../../data") else "/Users/yoonha/cernbox/AstroPix"
-    noise_scan_summary=f"{datadir}/NoiseScan/{args.name}_{threshold:.0f}_summary.csv"
-    pixels_to_mask = pd.read_csv(noise_scan_summary)
+    findyaml = f"{dir_name}/*_{date}.yml"
+    yamlpath = glob.glob(findyaml)
+    #print(yamlpath[0])
 
-    for index, row in pixels_to_mask.iterrows():
-        _row = int( row['row'])
-        _col = int( row['col'])
-        _nreadouts = int( row['nReadouts'])
-        _nhits = int( row['nHits'])
-        masking_logic = (_nreadouts > args.rdothr) or (_nhits > args.hitthr)
-        if(masking_logic): disablepix.append([_col, _row, 1])
-
-    pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
-    print(pixs)
-    npixel = '%.2f' % ( (1-(len(pixs)/1225)) * 100.)
-    print(f"{len(pixs)}, {npixel}% active")
+    pixs=yaml_reader(yamlpath[0])
+    navailpixs = pixs[pixs['disable'] == 0].shape[0]
+    npixel = '%.2f' % ( (navailpixs/1225) * 100.)
+    print(f"{navailpixs}, {npixel}% active")
      
     ##### Create hit pixel dataframes #######################################################
     # Hit pixel information for all events
@@ -228,7 +224,7 @@ def main(args):
     # Text
     ax[1, 2].set_axis_off()
     ax[1, 2].text(0.1, 0.85, f"Beam: {args.beaminfo}", fontsize=15, fontweight = 'bold');
-    ax[1, 2].text(0.1, 0.80, f"ChipID: {args.name}", fontsize=15, fontweight = 'bold');
+    ax[1, 2].text(0.1, 0.80, f"ChipID: {name}", fontsize=15, fontweight = 'bold');
     ax[1, 2].text(0.1, 0.40, f"Available Pixels: {npixel}%", fontsize=15, fontweight = 'bold');
 #    ax[0, 2].text(0.1, 0.75, f"Runs: {runnum}", fontsize=15, fontweight = 'bold');
     ax[1, 2].text(0.1, 0.70, f"Events: {tot_n_evts}", fontsize=15, fontweight = 'bold');
