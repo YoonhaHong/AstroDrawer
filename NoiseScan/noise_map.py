@@ -164,7 +164,7 @@ def main(args):
     ax[0, 2].text(2.5, 30.5, f'nReadouts > {nReadouts_threshold}', fontsize=16)
 
     
-    plt.savefig(f"./fig/{args.name}_THR{args.threshold}_All.pdf")
+    plt.savefig(f"./fig/{args.name}_THR{args.threshold}_rdo>{nReadouts_threshold}_hit>{nHits_threshold}_All.pdf")
     plt.show()
 
 

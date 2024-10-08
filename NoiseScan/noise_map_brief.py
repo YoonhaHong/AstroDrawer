@@ -108,7 +108,7 @@ def Maskmap(output):
     plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
     #fig.suptitle(f'chip ID = {args.name}, Threhold = {args.threshold} mV', fontsize=16, fontweight='bold')
 
-    plt.savefig(f"./fig/{args.name}_THR{args.threshold}_{args.drawOption}.pdf")
+    plt.savefig(f"./fig/{args.name}_THR{args.threshold}_rdo>{nReadouts_threshold}_hit>{nHits_threshold}_{args.drawOption}.pdf")
     plt.show()
 
 

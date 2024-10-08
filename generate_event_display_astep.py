@@ -36,10 +36,14 @@ def main(args):
     dir_name = os.path.dirname(f)
     file_name = file_name.rstrip('.csv')
 
+    thr_match = re.search(r'THR(\d+)', file_name)
 
+    # THR 뒤에 _로 구분된 문자열들을 추출 (csv 확장자는 제외)
+    split_parts = re.split(r'THR\d+\.?\d*_', file_name)[-1].split('_')
 
-    threshold = args.threshold 
-    name = args.name
+    threshold = thr_match.group(1) if thr_match else args.threshold  
+    name = split_parts[0]
+    date = split_parts[1]
 
     df = pd.read_csv(f,sep='\t')
     #print(df.head())
@@ -135,7 +139,6 @@ def main(args):
     ###############################################################################################
     # Masking pixels
     # Read noise scan summary file
-    #datadir = "../../data" if os.path.exists("../../data") else "/Users/yoonha/cernbox/AstroPix"
     #findyaml = f"{dir_name}/*_{date}.yml"
     #yamlpath = glob.glob(findyaml)
     #print(yamlpath[0])
@@ -145,6 +148,14 @@ def main(args):
     #navailpixs = pixs[pixs['disable'] == 0].shape[0]
     #npixel = '%.2f' % ( (navailpixs/1225) * 100.)
     #print(f"{navailpixs}, {npixel}% active")
+    disablepix=[]
+    for r in range(0,35,1):
+        for c in range(0,3,1): # 0-4 col
+                disablepix.append([c, r, 1])
+    pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
+    print(pixs)
+    npixel = '%.2f' % ( (1-(len(pixs)/1225)) * 100.)
+    print(f"{len(pixs)}, {npixel}% active")
      
     ##### Create hit pixel dataframes #######################################################
     # Hit pixel information for all events
@@ -178,10 +189,10 @@ def main(args):
     ax[0, 0].xaxis.set_tick_params(labelsize = 14)
     ax[0, 0].yaxis.set_tick_params(labelsize = 14)
 
-    #p2 = ax[0, 1].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
-    #                     weights=pixs['disable'], 
-    #                     norm=Normalize(vmin=0,vmax=1),cmap='Greys')
-    #fig.colorbar(p2[3], ax=ax[0, 1]).set_label(label='Masked', weight='bold', size=14)
+    p2 = ax[0, 1].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
+                         weights=pixs['disable'], 
+                         norm=Normalize(vmin=0,vmax=1),cmap='Greys')
+    fig.colorbar(p2[3], ax=ax[0, 1]).set_label(label='Masked', weight='bold', size=14)
     ax[0,1].grid()
     ax[0, 1].set_xlabel('Col', fontweight = 'bold', fontsize=14)
     ax[0, 1].set_ylabel('Row', fontweight = 'bold', fontsize=14)
@@ -189,12 +200,12 @@ def main(args):
     ax[0, 1].yaxis.set_tick_params(labelsize = 14)
 
 #p1+p2 overlay plot
-    #p3 = ax[0,2].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
-    #                    weights=pixs['disable'], 
-    #                    norm=Normalize(vmin=0,vmax=1),cmap='Greys')
-    # p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
+    p3 = ax[0,2].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
+                        weights=pixs['disable'], 
+                        norm=Normalize(vmin=0,vmax=1),cmap='Greys')
+    #p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
     p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0)
-#    p3 = ax[1, 0].hist2d(x=dfpixel['col'], y=dfpixel['row'], bins=35, range=[[-0.5,34.5],[-0,35]], weights=dfpixel['norm_sum_avg_tot_us'], cmap='Blues',cmin=1.0, norm=matplotlib.colors.LogNorm())
+    #p3 = ax[1, 0].hist2d(x=dfpixel['col'], y=dfpixel['row'], bins=35, range=[[-0.5,34.5],[-0,35]], weights=dfpixel['norm_sum_avg_tot_us'], cmap='Blues',cmin=1.0, norm=matplotlib.colors.LogNorm())
     fig.colorbar(p3[3], ax=ax[0, 2]).set_label(label='Hit Counts', weight='bold', size=14)
     ax[0,2].grid()
     ax[0,2].set_xlabel('Col', fontweight = 'bold', fontsize=14)
@@ -222,7 +233,7 @@ def main(args):
     ax[1, 2].set_axis_off()
     ax[1, 2].text(0.1, 0.85, f"Beam: {args.beaminfo}", fontsize=15, fontweight = 'bold');
     ax[1, 2].text(0.1, 0.80, f"ChipID: {name}", fontsize=15, fontweight = 'bold');
-    #ax[1, 2].text(0.1, 0.40, f"Available Pixels: {npixel}%", fontsize=15, fontweight = 'bold');
+    ax[1, 2].text(0.1, 0.40, f"Available Pixels: {npixel}%", fontsize=15, fontweight = 'bold');
 #    ax[0, 2].text(0.1, 0.75, f"Runs: {runnum}", fontsize=15, fontweight = 'bold');
     ax[1, 2].text(0.1, 0.70, f"Events: {tot_n_evts}", fontsize=15, fontweight = 'bold');
     ax[1, 2].text(0.1, 0.60, "Processed below", fontsize=15, fontweight = 'bold');
@@ -238,7 +249,7 @@ def main(args):
     #plt.savefig(f"{args.outdir}/{args.beaminfo}_{args.name}_run_{runnum}_evtdisplay.png")
     #print(f"{args.outdir}/{args.beaminfo}_{args.name}_run_{runnum}_evtdisplay.png was created...")
 
-    figdir=args.outdir if args.outdir else os.path.dirname(f)
+    figdir=args.outdir if args.outdir else dir_name
     plt.savefig(f"{figdir}/{file_name}_{args.beaminfo}_diffTS{args.timestampdiff}_diffToT{args.totdiff}.png")
     print(f"Saved at {figdir}")
     plt.show()
