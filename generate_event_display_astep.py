@@ -15,7 +15,7 @@ import glob
 from matplotlib.colors import Normalize
 import matplotlib as mpl
 import asyncio
-from utility import yaml_reader
+from utility import yaml_reader_astep
 plt.style.use('classic')
 
 def main(args):
@@ -139,19 +139,18 @@ def main(args):
     ###############################################################################################
     # Masking pixels
     # Read noise scan summary file
-    #findyaml = f"{dir_name}/*_{date}.yml"
-    #yamlpath = glob.glob(findyaml)
-    #print(yamlpath[0])
+    findyaml = f"{dir_name}/{file_name}*.yml"
+    yamlpath = glob.glob(findyaml)
+    print(yamlpath[0])
 
-    #pixs=yaml_reader(yamlpath[0])
-    pixs=[]
-    #navailpixs = pixs[pixs['disable'] == 0].shape[0]
-    #npixel = '%.2f' % ( (navailpixs/1225) * 100.)
-    #print(f"{navailpixs}, {npixel}% active")
+    pixs=yaml_reader_astep(yamlpath[0])
+    navailpixs = pixs[pixs['disable'] == 0].shape[0]
+    npixel = '%.2f' % ( (navailpixs/1225) * 100.)
+    print(f"{navailpixs}, {npixel}% active")
     disablepix=[]
-    for r in range(0,35,1):
-        for c in range(0,3,1): # 0-4 col
-                disablepix.append([c, r, 1])
+    #for r in range(0,35,1):
+     #   for c in range(0,3,1): # 0-4 col
+      #          disablepix.append([c, r, 1])
     pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
     print(pixs)
     npixel = '%.2f' % ( (1-(len(pixs)/1225)) * 100.)
@@ -203,7 +202,7 @@ def main(args):
     p3 = ax[0,2].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
                         weights=pixs['disable'], 
                         norm=Normalize(vmin=0,vmax=1),cmap='Greys')
-    #p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
+    p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
     p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0)
     #p3 = ax[1, 0].hist2d(x=dfpixel['col'], y=dfpixel['row'], bins=35, range=[[-0.5,34.5],[-0,35]], weights=dfpixel['norm_sum_avg_tot_us'], cmap='Blues',cmin=1.0, norm=matplotlib.colors.LogNorm())
     fig.colorbar(p3[3], ax=ax[0, 2]).set_label(label='Hit Counts', weight='bold', size=14)
@@ -282,7 +281,7 @@ if __name__ == "__main__":
     parser.add_argument('-tot','--totdiff', type=float, required=False, default=10,
                     help = 'error in ToT[us] in pixel matching (default:(col.tot-row.tot)/col.tot<10%)')
     
-    parser.add_argument('-b', '--beaminfo', default='None', required=False,
+    parser.add_argument('-b', '--beaminfo', default='Sr90', required=False,
                     help='beam information ex) proton120GeV')
 
     parser.add_argument('-ns', '--noisescandir', action='store', required=False, type=str, default ='../astropix-python/noisescan',
