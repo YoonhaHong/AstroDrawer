@@ -143,11 +143,10 @@ def main(args):
     yamlpath = glob.glob(findyaml)
     print(yamlpath[0])
 
-    pixs=yaml_reader_astep(yamlpath[0])
-    navailpixs = pixs[pixs['disable'] == 0].shape[0]
+    disablepix=yaml_reader_astep(yamlpath[0])
+    navailpixs = disablepix[disablepix['disable'] == 0].shape[0]
     npixel = '%.2f' % ( (navailpixs/1225) * 100.)
     print(f"{navailpixs}, {npixel}% active")
-    disablepix=[]
     #for r in range(0,35,1):
      #   for c in range(0,3,1): # 0-4 col
       #          disablepix.append([c, r, 1])
