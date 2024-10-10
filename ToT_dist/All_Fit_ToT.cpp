@@ -13,35 +13,46 @@
 vector<double> load_txt_file(const string& directory, int col, int rows_to_draw); 
 double langaufun(double *x, double *par);
 
+const int NBIN=50;
+const int MAXTOT=25;
 
-void All_Fit_ToT(std::string directory = "/Users/yoonha/cernbox/A-STEP/241005/ToT_distributions_THR200_APS3-W08-S03_20241005_175622") {
+
+void All_Fit_ToT(std::string directory = 
+    //"/Users/yoonha/cernbox/A-STEP/241009/ToT_distributions_THR200_APS3-W08-S03_20241009_123320") {
+    //"/Users/yoonha/cernbox/A-STEP/241009/ToT_distributions_THR200_APS3-W08-S03_20241009_135630") {
+    "/Users/yoonha/cernbox/A-STEP/241009/ToT_distributions_new_THR200_APS3-W08-S03_20241009_164047") {
 
     std::vector<int> cols_to_draw;  // Default columns
     std::vector<int> rows_to_draw;  // Default rows_to_draw
 
-    //rows_to_draw = {15, 16, 17, 18};
-    //cols_to_draw = {15, 16, 17, 18};
+    //cols_to_draw = {15, 16, 17, 18, 19};
+    //rows_to_draw = {25, 26, 27, 28, 29};
 
-    cols_to_draw = {4, 5, 6, 7, 8};
-    rows_to_draw = {1};
+    cols_to_draw = {30, 31, 32, 33, 34};
+    rows_to_draw = {10, 11, 12, 13, 14};
 
     const int nc = cols_to_draw.size();  // Number of columns
     const int nr = rows_to_draw.size();  // Number of rows_to_draw
 
 
-
+    std::string file_name = gSystem->BaseName(directory.c_str());
+    std::ofstream file( ( "./" + file_name + ".csv").c_str() );
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open the file." << std::endl;
+        return;
+    }
     // Create a histogram to hold all the values
-    TH1F* hist_tot_all = new TH1F("hist_tot_all", "Total Histogram", 20, 0, 20);
+    TH1F* hist_tot_all = new TH1F("hist_tot_all", "Total Histogram", NBIN, 0, MAXTOT);
     TH1F* hist_tot_pixel[35][35];
     TF1* fit_tot_pixel[35][35];
 
     TH1F* hist_MPV = new TH1F("hist_MPV", "MPV Distribution", 50, 0, 10);
 
-    std::ofstream file("output.csv");
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open the file." << std::endl;
-        return;
-    }
+    TH2F* h2_hit = new TH2F("h2_hit", "h2_hit", 35, 0, 35, 35, 0, 35);
+    TH2F* h2_MPV = new TH2F("h2_MPV", "h2_MPV", 35, 0, 35, 35, 0, 35);
+    TH2F* h2_chisqrndf = new TH2F("h2_chisqrndf", "h2_chisqrndf", 35, 0, 35, 35, 0, 35);
+
+
     file << "col,row,nhits,MPV,chi2/ndf" << std::endl;
     float MPV[35][35];
 
@@ -57,7 +68,7 @@ void All_Fit_ToT(std::string directory = "/Users/yoonha/cernbox/A-STEP/241005/To
             // Load data for the current column and rows_to_draw
             std::vector<double> data = load_txt_file(directory, c, r);
 
-            hist_tot_pixel[c][r] = new TH1F(Form("c%d_r%d", c, r), Form("c%d_r%d", c, r), 20, 0, 20);
+            hist_tot_pixel[c][r] = new TH1F(Form("c%d_r%d", c, r), Form("c%d_r%d", c, r), NBIN, 0, MAXTOT);
 
             if (data.empty()){
                 continue;
@@ -77,11 +88,13 @@ void All_Fit_ToT(std::string directory = "/Users/yoonha/cernbox/A-STEP/241005/To
             for(int par=0; par<4; par++) fit_tot_pixel[c][r] -> SetParLimits( par, pllo[par], plhi[par]);
             hist_tot_pixel[c][r]->Fit(Form("langau_c%d_r%d", c, r), "RQ");
             fit_tot_pixel[c][r]->GetParameters(fp);
+
+            float tMPV = fp[1];
             float chisqr = fit_tot_pixel[c][r]->GetChisquare();
             float ndf = fit_tot_pixel[c][r]->GetNDF();
 
-            hist_MPV -> Fill( fp[1] );
-            file << c << ',' << r << ',' << hit << ',' << fp[1] << ',' << chisqr/ndf << std::endl;
+            hist_MPV -> Fill( tMPV );
+            file << c << ',' << r << ',' << hit << ',' << tMPV << ',' << chisqr/ndf << std::endl;
 
             MPV[c][r] = fp[1];
             if(MPV[c][r]<1e-3) std::cout << c << ' ' << r << "  Small MPV! " <<std::endl ;
@@ -89,11 +102,14 @@ void All_Fit_ToT(std::string directory = "/Users/yoonha/cernbox/A-STEP/241005/To
         }
     }
 
+    file.close();
+    std::cout << "CSV file written successfully." << std::endl;
+
     // Create canvas and divide it into nc*nr pads
     TCanvas* cToT = new TCanvas("ToT", "ToT Dist.", 200 * nc, 200 * nr);
-    cToT->Divide(nc, nr, 0, 0);
-    gStyle->SetOptStat(1111);
-    gStyle->SetOptFit(111);
+    cToT->Divide(nc, nr, 0.0005, 0.0005);
+
+    TPad* pToT[nc*nr];
 
     int index = 0;
     for (int row: rows_to_draw) {
@@ -102,9 +118,30 @@ void All_Fit_ToT(std::string directory = "/Users/yoonha/cernbox/A-STEP/241005/To
             cToT -> cd(index+1);
             index++;
 
-            hist_tot_pixel[col][row]->Draw();
+
+            /*
+            pToT[index] = new TPad( Form("Pad_%d", index+1), Form("%d", index+1), 0, 0, 1, 1); 
+            pToT[index] -> SetMargin(.13, .05, .12, .05);
+            //pToT[index] -> SetLogy();
+            pToT[index] -> Draw();
+            pToT[index] -> cd();
+
+            TH1* FrameToT = pToT[index] -> DrawFrame( 0, 0, MAXTOT, 250 );
+            FrameToT -> GetXaxis() -> SetLabelSize(0.05);
+            FrameToT -> GetXaxis() -> SetTitleSize(0.05);
+            //FrameToT -> GetXaxis() -> SetTitle( Form("PMT%d ADC_{integral} [ns #times ADC]", b+1) );
+            FrameToT -> GetYaxis() -> SetLabelSize(0.05);
+            FrameToT -> GetYaxis() -> SetTitleSize(0.05);
+
+            FrameToT -> Draw();
+            */
+
+            hist_tot_pixel[col][row]->Draw("SAME");
             if(MPV[col][row]<0.1) continue;
             fit_tot_pixel[col][row]->Draw("L SAME");
+
+            gStyle->SetOptStat(1111);
+            gStyle->SetOptFit(111);
         }
         printf("\n");
     }
@@ -114,13 +151,10 @@ void All_Fit_ToT(std::string directory = "/Users/yoonha/cernbox/A-STEP/241005/To
     hist_MPV -> Draw();
     TFitResultPtr fit_result = hist_MPV->Fit("gaus", "SQ");
 
-    std::string outdir;
-    std::string figdir = outdir.empty() ? "." : outdir;
-    std::string file_name = gSystem->BaseName(directory.c_str());
+    std::string figdir = "./fig";
     cToT->SaveAs((figdir + "/" + file_name + ".pdf").c_str());
+    return;
 
-    file.close();
-    std::cout << "CSV file written successfully." << std::endl;
 
 
 }
@@ -134,7 +168,7 @@ std::vector<double> load_txt_file(const std::string& directory, int col, int row
     std::vector<double> data;
 
     if (!file.is_open()) {
-        //std::cerr << "File " << filepath << " not found." << std::endl;
+        std::cerr << "File " << filepath << " not found." << std::endl;
         return data;  // Return empty vector if file not found
     }
 
