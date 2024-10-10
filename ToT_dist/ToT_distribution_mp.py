@@ -5,7 +5,9 @@ import argparse
 import pandas as pd
 import numpy as np
 import glob
-from utility import yaml_reader_astep
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Multiprocess_astep import parallel_process 
 
 def main(args):
@@ -32,12 +34,6 @@ def main(args):
     findyaml = f"{dir_name}/{file_name}*.yml"
     yamlpath = glob.glob(findyaml)
     print(yamlpath[0])
-
-    disablepix=yaml_reader_astep(yamlpath[0])
-    navailpixs = disablepix[disablepix['disable'] == 0].shape[0]
-    npixel = '%.2f' % ( (navailpixs/1225) * 100.)
-    print(f"{navailpixs}, {npixel}% active")
-    pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
      
     ##### Create hit pixel dataframes #######################################################
     # Hit pixel information for all events
