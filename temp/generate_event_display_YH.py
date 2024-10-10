@@ -5,7 +5,6 @@
 """
 import os
 import re
-import time
 import argparse
 import csv
 import matplotlib.pyplot as plt
@@ -16,18 +15,23 @@ import glob
 from matplotlib.colors import Normalize
 import matplotlib as mpl
 import asyncio
-from utility import yaml_reader_astep
+from utility import yaml_reader
 plt.style.use('classic')
 
 def main(args):
 
-
+    ##### Loop over data files and Find hit pixels #######################################################
+    # List for hit pixels
     pair = [] 
+    # How many events are remained in one dataset
     tot_n_nans = 0
     tot_n_evts = 0
+    n_evt_excluded = 0
     n_evt_used = 0
+    # Loop over file
+    #for f in all_files:
+     # Read csv file
     f = args.inputfile
-    #f = "/Users/yoonha/cernbox/A-STEP/241009/THR200_APS3-W08-S03_20241010_093739.csv"
     file_name = os.path.basename(f)
     dir_name = os.path.dirname(f)
     file_name = file_name.rstrip('.csv')
@@ -41,7 +45,7 @@ def main(args):
     name = split_parts[0]
     date = split_parts[1]
 
-    df = pd.read_csv(f,sep='\t')
+    df = pd.read_csv(f,sep=',')
     #print(df.head())
     print(f"Reading is done")
 
@@ -60,7 +64,16 @@ def main(args):
     df['readout'] = df['readout'].astype('Int64')
 
     #add
-    #print(df.head())
+    print(df.head())
+    if 'readout' in df.columns:
+        if len(df['readout']) > 0:
+            max_n_readouts = df['readout'].iloc[-1]
+            print(f"Max readout value: {max_n_readouts}")
+        else:
+            print("The 'readout' column is empty.")
+    else:
+        print("The 'readout' column does not exist.")
+
     # Get last number of readouts/events per run
     max_readout_n = df['readout'].iloc[-1]
     
@@ -77,72 +90,63 @@ def main(args):
     tot_n_nans += n_nan_evts
 
     # Loop over readouts/events
-    for ievt in range(0, max_readout_n+1):
-        dff = df[(df['readout'] == ievt)]
-        
+    for ievt in range(0, max_readout_n+1, 1):
+        dff = df.loc[(df['readout'] == ievt) & (df['payload'] == 4) & (df['Chip ID'] == 0)]
         if dff.empty:
             continue
-
-        n_evt_used += 1
-
-        # Separate col and row info only once
-        dffcol = dff[dff['isCol'] == True].copy()
-        dffrow = dff[dff['isCol'] == False].copy()
-
-        # Avoid empty column or row frames
-        if dffcol.empty or dffrow.empty:
-            continue
-
-        # Calculate differences for timestamp and tot_us
-        dffcol_tot_us = dffcol['tot_us'].values
-        dffrow_tot_us = dffrow['tot_us'].values
-        dffcol_timestamp = dffcol['timestamp'].values
-        dffrow_timestamp = dffrow['timestamp'].values
-
-        for indc in range(len(dffcol)):
-            # Filter valid col rows upfront
-            if dffcol_tot_us[indc] == 0:
-                continue
-
-            # Use NumPy vectorized operations to find matching rows
-            timestamp_diff_check = np.abs(dffcol_timestamp[indc] - dffrow_timestamp) < args.timestampdiff
-            tot_diff_check = (np.abs(dffcol_tot_us[indc] - dffrow_tot_us) / dffcol_tot_us[indc] * 100) < args.totdiff
-
-            matching_indices = np.where(timestamp_diff_check & tot_diff_check)[0]
-
-            for indr in matching_indices:
-                # Record hit pixels per event
-                average_tot = (dffcol_tot_us[indc] + dffrow_tot_us[indr]) / 2
-                pair.append([
-                    dffcol['location'].iloc[indc], 
-                    dffrow['location'].iloc[indr], 
-                    dffcol_timestamp[indc], 
-                    dffrow_timestamp[indr], 
-                    dffcol_tot_us[indc], 
-                    dffrow_tot_us[indr], 
-                    average_tot
-                ])
-
+        # Match col and row to find hit pixel
+        else:
+            n_evt_used += 1
+            # List column info of pixel within one event
+            dffcol = dff.loc[dff['isCol'] == True]
+            # List row info of pixel within one event
+            dffrow = dff.loc[dff['isCol'] == False]
+            # Matching conditions: timestamp and time-over-threshold (ToT)
+            timestamp_diff = args.timestampdiff
+            tot_time_limit = args.totdiff
+            # Loop over col and row info to find a pair to define a pixel
+            for indc in dffcol.index:
+                for indr in dffrow.index:
+                    if dffcol['tot_us'][indc] == 0 or dffrow['tot_us'][indr] ==0:
+                        continue
+                    if (abs(dffcol['timestamp'][indc] - dffrow['timestamp'][indr]) < timestamp_diff) & (abs(dffcol['tot_us'][indc] - dffrow['tot_us'][indr])/dffcol['tot_us'][indc]*100 < tot_time_limit):
+                        if (dffcol['location'][indc] > 34 or dffrow['location'][indr] > 34):
+                            print(f"[Matching but Continue] col.location, row.location = {dffcol['location'][indc]},{dffrow['location'][indr]}")
+                            continue
+                        # Record hit pixels per event
+                        average_tot = ((dffcol['tot_us'][indc] + dffrow['tot_us'][indr])/2)
+                        pair.append([ dffcol['location'][indc], dffrow['location'][indr], dffcol['timestamp'][indc], dffrow['timestamp'][indr], dffcol['tot_us'][indc], dffrow['tot_us'][indr], ((dffcol['tot_us'][indc] + dffrow['tot_us'][indr])/2)])
     print("... Matching is done!")
+    ######################################################################################################
 
     ##### Summary of how many events being used ###################################################
     nevents = '%.2f' % ((n_evt_used/(tot_n_evts)) * 100.)
+    nnanevents = '%.2f' % ((tot_n_nans/(tot_n_evts)) * 100.)
+    n_empty = tot_n_evts - n_evt_used - tot_n_nans
+    nemptyevents = '%.2f' % ((n_empty/(tot_n_evts)) * 100.)
     print("Summary:")
+    print(f"{tot_n_nans} of {tot_n_evts} events were found as NaN...")
+    print(f"{n_empty} of {tot_n_evts} events were found as empty...")
     print(f"{n_evt_used} of {tot_n_evts} events were processed...")
-    t_match = time.time()
-    print(f"Matching {t_match-t_start} Elapsed")
+#        print(f"{n_evt_excluded} of {tot_n_evts} events were excluded because of bad payload...")
+#        print(f"{nevents}[%] are used in exclusively mode...")
+#        print(f"{nnanevents}[%] are trashed...")
+#        print(f"{nemptyevents}[%] are emptied...")
+#        print(f"{nevents}[%] are used...")
+#        print(f"{nnanevents}[%] are trashed...")
+#        print(f"{nemptyevents}[%] are emptied...")
 
-    ##### Find masked pixel and save it as pixs###########################################################
-    findyaml = f"{dir_name}/{file_name}*.yml"
+    ###############################################################################################
+    # Masking pixels
+    # Read noise scan summary file
+    findyaml = f"{dir_name}/*_{date}.yml"
     yamlpath = glob.glob(findyaml)
-    print(yamlpath[0])
+    #print(yamlpath[0])
 
-    disablepix=yaml_reader_astep(yamlpath[0])
-    navailpixs = disablepix[disablepix['disable'] == 0].shape[0]
+    pixs=yaml_reader(yamlpath[0])
+    navailpixs = pixs[pixs['disable'] == 0].shape[0]
     npixel = '%.2f' % ( (navailpixs/1225) * 100.)
     print(f"{navailpixs}, {npixel}% active")
-    pixs=pd.DataFrame(disablepix, columns=['col','row','disable'])
-    #print(pixs)
      
     ##### Create hit pixel dataframes #######################################################
     # Hit pixel information for all events
@@ -156,7 +160,7 @@ def main(args):
     nhits = dfpairc['hits'].sum()
     # mean of avg_tot_us, each col, row
     grouped_avg = dffpair.groupby(['col', 'row'])['avg_tot_us'].mean().reset_index(name='avg')
-    #print(grouped_avg)
+    print(grouped_avg)
 
     # Generate Plot - Pixel hits
     #fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(20, 8))
@@ -190,9 +194,9 @@ def main(args):
     p3 = ax[0,2].hist2d(x=pixs['col'], y=pixs['row'], bins=35, range=[[0.,35],[0,35]], 
                         weights=pixs['disable'], 
                         norm=Normalize(vmin=0,vmax=1),cmap='Greys')
-    p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
+    # p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0, norm=matplotlib.colors.LogNorm())
     p3 = ax[0,2].hist2d(x=dfpairc['col'], y=dfpairc['row'], bins=35, range=[[0,35],[0,35]], weights=dfpairc['hits'], cmap='YlOrRd', cmin=1.0)
-    #p3 = ax[1, 0].hist2d(x=dfpixel['col'], y=dfpixel['row'], bins=35, range=[[-0.5,34.5],[-0,35]], weights=dfpixel['norm_sum_avg_tot_us'], cmap='Blues',cmin=1.0, norm=matplotlib.colors.LogNorm())
+#    p3 = ax[1, 0].hist2d(x=dfpixel['col'], y=dfpixel['row'], bins=35, range=[[-0.5,34.5],[-0,35]], weights=dfpixel['norm_sum_avg_tot_us'], cmap='Blues',cmin=1.0, norm=matplotlib.colors.LogNorm())
     fig.colorbar(p3[3], ax=ax[0, 2]).set_label(label='Hit Counts', weight='bold', size=14)
     ax[0,2].grid()
     ax[0,2].set_xlabel('Col', fontweight = 'bold', fontsize=14)
@@ -208,7 +212,7 @@ def main(args):
     ax[1, 0].xaxis.set_tick_params(labelsize = 14)
     ax[1, 0].yaxis.set_tick_params(labelsize = 14)
 
-    p5 = ax[1, 1].hist(x=dffpair['avg_tot_us'], bins=22, range=(0, 22), color='blue', edgecolor='black')
+    p5 = ax[1, 1].hist(x=dffpair['avg_tot_us'], bins=60, range=(0, 30), color='blue', edgecolor='black')
 #    fig.colorbar(p5[3], ax=ax[1, 2]).set_label(label='Average Normalized Time-over-Threshold[us]', weight='bold', size=18)
     ax[1, 1].grid()
     ax[1, 1].set_xlabel('ToT [us]', fontweight = 'bold', fontsize=14)
@@ -245,7 +249,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Astropix Driver Code')
 
-    parser.add_argument('-if', '--inputfile', required=False, default =None,
+    parser.add_argument('-if', '--inputfile', required=True, default =None,
                     help = 'input file')
 
     parser.add_argument('-n', '--name', default='APSw08s03', required=False,
@@ -278,7 +282,4 @@ if __name__ == "__main__":
     parser.add_argument
     args = parser.parse_args()
 
-    t_start = time.time()
     main(args)
-    t_end = time.time()
-    print(f"{t_end-t_start} Elapsed")
