@@ -27,8 +27,8 @@ def main(args):
     tot_n_nans = 0
     tot_n_evts = 0
     n_evt_used = 0
-    #f = args.inputfile
-    f = "/Users/yoonha/cernbox/A-STEP/241009/THR200_APS3-W08-S03_20241010_093739.csv"
+    f = args.inputfile
+    #f = "/Users/yoonha/cernbox/A-STEP/241009/THR200_APS3-W08-S03_20241010_093739.csv"
     file_name = os.path.basename(f)
     dir_name = os.path.dirname(f)
     file_name = file_name.rstrip('.csv')

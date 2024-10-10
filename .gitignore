@@ -1,4 +1,5 @@
 NoiseScan/noise*/
+__pycache__
 InjectionScan
 .DS_Store
 *.pdf
