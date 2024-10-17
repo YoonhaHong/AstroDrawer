@@ -17,7 +17,7 @@ const int NBIN=50;
 const int MAXTOT=25;
 
 
-void All_Fit_ToT(std::string directory = 
+void Draw_ToT_certain(std::string directory = 
     //"/Users/yoonha/cernbox/A-STEP/241009/ToT_distributions_THR200_APS3-W08-S03_20241010_094016") {
     "/Users/yoonha/cernbox/A-STEP/241011/ToT_distributions_THR200_APS3-W08-S11_20241011_170850") {
 
@@ -27,16 +27,21 @@ void All_Fit_ToT(std::string directory =
     cols_to_draw = {15, 16, 17, 18, 19};
     rows_to_draw = {24, 23, 22, 21, 20};
 
+    //cols_to_draw = {5, 6, 7, 8, 9};
+    //rows_to_draw = {4, 3, 2, 1, 0};
+
     const int nc = cols_to_draw.size();  // Number of columns
     const int nr = rows_to_draw.size();  // Number of rows_to_draw
 
 
     std::string file_name = gSystem->BaseName(directory.c_str());
+    /*
     std::ofstream file( ( "./" + file_name + ".csv").c_str() );
     if (!file.is_open()) {
         std::cerr << "Error: Could not open the file." << std::endl;
         return;
     }
+    */
     // Create a histogram to hold all the values
     TH1F* hist_tot_all = new TH1F("hist_tot_all", "Total Histogram", NBIN, 0, MAXTOT);
     TH1F* hist_tot_pixel[35][35];
@@ -49,18 +54,18 @@ void All_Fit_ToT(std::string directory =
     TH2F* h2_chisqrndf = new TH2F("h2_chisqrndf", "h2_chisqrndf", 35, 0, 35, 35, 0, 35);
 
 
-    file << "col,row,nhits,MPV,chi2/ndf" << std::endl;
+    //file << "col,row,nhits,MPV,chi2/ndf" << std::endl;
     float MPV[35][35];
 
     // Width, MP, Area, GSigma
     double pllo[4] = {0.09, 0.5, 5, 0.2};
-    double plhi[4] = {2.80, 20.0, 10000, 1.8};
+    double plhi[4] = {2.80, 20.0, 90000, 1.8};
     double sv[4] = {0.5, 4.0, 500, 0.4};
 
     double fp[4], fpe[4];
 
-    for (int r=0; r<35; r++) {
-        for (int c=0; c<35; c++) {
+    for (int r : rows_to_draw) {
+        for (int c : cols_to_draw) {
             // Load data for the current column and rows_to_draw
             std::vector<double> data = load_txt_file(directory, c, r);
 
@@ -90,15 +95,16 @@ void All_Fit_ToT(std::string directory =
             float ndf = fit_tot_pixel[c][r]->GetNDF();
 
             hist_MPV -> Fill( tMPV );
-            file << c << ',' << r << ',' << hit << ',' << tMPV << ',' << chisqr/ndf << std::endl;
+            //file << c << ',' << r << ',' << hit << ',' << tMPV << ',' << chisqr/ndf << std::endl;
 
             MPV[c][r] = tMPV;
+
 
 
         }
     }
 
-    file.close();
+    //file.close();
     std::cout << "CSV file written successfully." << std::endl;
 
     // Create canvas and divide it into nc*nr pads
@@ -114,6 +120,8 @@ void All_Fit_ToT(std::string directory =
             cToT -> cd(index+1);
             index++;
 
+            gStyle->SetOptStat(11);
+            gStyle->SetOptFit(111);
 
             /*
             pToT[index] = new TPad( Form("Pad_%d", index+1), Form("%d", index+1), 0, 0, 1, 1); 
@@ -136,19 +144,24 @@ void All_Fit_ToT(std::string directory =
             if(MPV[col][row]<0.1) continue;
             fit_tot_pixel[col][row]->Draw("L SAME");
 
-            gStyle->SetOptStat(1111);
-            gStyle->SetOptFit(111);
+            TLatex* t1 = new TLatex();
+            t1 -> SetTextSize( 0.08 );
+            t1 -> DrawLatexNDC(.5, .5, Form("MPV = %.2f", MPV[col][row]) );
         }
         printf("\n");
     }
-
+    /*
     TCanvas* c2 = new TCanvas("c2", "MPV Dist.", 800, 800);
     c2 -> cd();
     hist_MPV -> Draw();
     TFitResultPtr fit_result = hist_MPV->Fit("gaus", "SQ");
+    */
 
     std::string figdir = "./fig";
-    //cToT->SaveAs((figdir + "/" + file_name + ".pdf").c_str());
+    TString Figpath;
+    Figpath.Form("%s/%s_c%dr%d.pdf",figdir.c_str(), file_name.c_str(), cols_to_draw[0], rows_to_draw[nr-1] );
+    //cToT->SaveAs((figdir + "/" + file_name + 'c'+ cols_to_draw[0] + 'r' + rows_to_draw[0] + ".pdf").c_str());
+    cToT -> SaveAs( Figpath );
     return;
 
 

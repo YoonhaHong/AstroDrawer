@@ -31,7 +31,7 @@ def plot_hist2d(df, x_col, y_col, z_col, color, file_name):
     ax.tick_params(labelsize=14)
     ax.grid()
 
-    plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.10)
+    plt.subplots_adjust(left=0.05, right=0.92, top=0.95, bottom=0.07)
     dirname = "./fig"
     filename =file_name[0:-4]+'_'+z_col.replace('/', '')
     plt.savefig(f"{dirname}/{filename}.png")
@@ -49,8 +49,8 @@ def main(args):
     file_name = os.path.basename(args.inputfile)
     # Plot 2D histograms for nhits, MPV, and chi2/ndf
     plot_hist2d(df, x_col='col', y_col='row', z_col='nhits',color='YlOrRd', file_name=file_name)
-    plot_hist2d(df, x_col='col', y_col='row', z_col='MPV', color='Blues', file_name=file_name)
-    plot_hist2d(df, x_col='col', y_col='row', z_col='chi2/ndf', color='gray_r', file_name=file_name)
+    #plot_hist2d(df, x_col='col', y_col='row', z_col='MPV', color='Blues', file_name=file_name)
+    #plot_hist2d(df, x_col='col', y_col='row', z_col='chi2/ndf', color='gray_r', file_name=file_name)
     
 if __name__ == "__main__":
 

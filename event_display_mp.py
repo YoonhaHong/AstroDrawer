@@ -1,9 +1,7 @@
-import multiprocessing as mp
 import os
 import re
 import time
 import argparse
-import csv
 import matplotlib.pyplot as plt
 import matplotlib
 import pandas as pd
@@ -11,7 +9,6 @@ import numpy as np
 import glob
 from matplotlib.colors import Normalize
 import matplotlib as mpl
-import asyncio
 from utility import yaml_reader_astep
 from Multiprocess_astep import parallel_process 
 plt.style.use('classic')
@@ -23,9 +20,6 @@ def main(args):
     t_start = time.time()
 
     pair = [] 
-    tot_n_nans = 0
-    tot_n_evts = 0
-    n_evt_used = 0
     f = args.inputfile
     file_name = os.path.basename(f)
     dir_name = os.path.dirname(f)
@@ -148,6 +142,9 @@ def main(args):
     #plt.savefig(f"{args.outdir}/{args.beaminfo}_{args.name}_run_{runnum}_evtdisplay.png")
     #print(f"{args.outdir}/{args.beaminfo}_{args.name}_run_{runnum}_evtdisplay.png was created...")
 
+    t_end = time.time()
+    print(f"{t_end-t_start} Elapsed")
+
     figdir=args.outdir if args.outdir else dir_name
     plt.savefig(f"{figdir}/{file_name}_{args.beaminfo}_diffTS{args.timestampdiff}_diffToT{args.totdiff}_mp.png")
     print(f"Saved at {figdir}")
@@ -189,10 +186,8 @@ if __name__ == "__main__":
 
     parser.add_argument
     args = parser.parse_args()
-
-    t_start = time.time()
     main(args)
-    t_end = time.time()
-    print(f"{t_end-t_start} Elapsed")
+
+
 
 
