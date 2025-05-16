@@ -169,7 +169,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot Hit Map with Masked Pixels from CSV file - MultiProcessing version')
     parser.add_argument("inputfile", type=str, help='Path to the input CSV file or directory')
-    parser.add_argument('-o', '--outdir', default="./fig", help='Output directory for the plot')
+    parser.add_argument('-o', '--outdir', default=None, help='Output directory for the plot')
     parser.add_argument('-td', '--timestampdiff', type=float, required=False, default=2,
                         help='difference in timestamp in pixel matching (default:col.ts-row.ts<2)')
     parser.add_argument('-tot', '--totdiff', type=float, required=False, default=10,
